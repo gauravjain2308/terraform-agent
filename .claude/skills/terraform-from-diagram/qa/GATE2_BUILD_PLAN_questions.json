@@ -1,0 +1,43 @@
+{
+  "phase": "GATE2_BUILD_PLAN",
+  "phase_name": "Build Plan Review Gate (ServiceModeler)",
+  "description": "Review service dependencies and wave ordering",
+  "questions": [
+    {
+      "question": "Are wave assignments correct based on dependencies?",
+      "category": "WaveOrder",
+      "required": true,
+      "notes": "Services with no dependencies must build first. Dependent services must wait."
+    },
+    {
+      "question": "Are there any circular dependencies between services?",
+      "category": "Dependencies",
+      "required": true,
+      "notes": "Circular deps must be resolved before building (merge or restructure)"
+    },
+    {
+      "question": "Is the state backend configuration correct?",
+      "category": "State",
+      "required": true,
+      "notes": "S3 bucket name and DynamoDB lock table follow naming patterns"
+    },
+    {
+      "question": "Are all service dependencies explicitly documented?",
+      "category": "Dependencies",
+      "required": true,
+      "notes": "Each service should list what it depends on (networking, IAM, databases)"
+    },
+    {
+      "question": "Are there missing services that should be added?",
+      "category": "Completeness",
+      "required": false,
+      "notes": "VPC, IAM roles, KMS keys, monitoring, etc."
+    },
+    {
+      "question": "Should any services be combined into a single wave?",
+      "category": "Optimization",
+      "required": false,
+      "notes": "Services with mutual dependencies or very tight coupling"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "phase": "GATE1_SERVICES",
+  "phase_name": "Service Review Gate (ServicesRefiner)",
+  "description": "Review and confirm service names, types, and initial connections",
+  "questions": [
+    {
+      "question": "Are all service names lowercase with hyphens (no spaces or underscores)?",
+      "category": "Naming",
+      "required": true,
+      "notes": "Example: api-gateway, rds-users, lambda-auth"
+    },
+    {
+      "question": "Are all service types correctly identified (Lambda, RDS, API Gateway, etc.)?",
+      "category": "ServiceType",
+      "required": true,
+      "notes": "Match service type to AWS service name"
+    },
+    {
+      "question": "Are there any duplicate service names?",
+      "category": "Validation",
+      "required": true,
+      "notes": "Each service must have a unique name"
+    },
+    {
+      "question": "Are all critical connections documented?",
+      "category": "Dependencies",
+      "required": true,
+      "notes": "Which services call which, which depend on databases, etc."
+    },
+    {
+      "question": "Are there any services that should be merged or split?",
+      "category": "Optimization",
+      "required": false,
+      "notes": "Refine service boundaries for better modularity"
+    },
+    {
+      "question": "Are environment-specific configurations documented?",
+      "category": "Environments",
+      "required": false,
+      "notes": "Dev/staging/prod variations"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "env": {
+    "BASH_MAX_OUTPUT_LENGTH": "150000"
+  },
+  "permissions": {
+    "additionalDirectories": [
+      "c:\\Users\\gauravjain05\\Downloads\\terraform-agent\\.claude\\commands"
+    ],
+    "allow": [
+      "Edit(/.claude/skills/terraform-from-diagram/**)"
+    ]
+  }
+}

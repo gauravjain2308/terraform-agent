@@ -1,11 +1,41 @@
-# ═══════════════════════════════════════════════════════════════════
-# .claude/.gitignore
-# The entire .claude/ folder is gitignored from the root .gitignore.
-# This file is a safety net.
-# ═══════════════════════════════════════════════════════════════════
+# Terraform working directories
+**/.terraform/
 
-# Ignore everything
-*
+# State files — NEVER commit
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform.tfstate.lock.info
 
-# Except this file
-!.gitignore
+# Variable files — NEVER commit real values
+*.tfvars
+!*.tfvars.example
+
+# Plan files
+tf.plan
+destroy.plan
+tf-cost.plan
+*.tfplan
+
+# Crash logs
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+
+# Generated deployment packages
+*.zip
+placeholder.zip
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# infracost / tflint cache
+.infracost/
+.tflint/
+
+# Lock file — ALWAYS commit (do NOT add here)
+# .terraform.lock.hcl

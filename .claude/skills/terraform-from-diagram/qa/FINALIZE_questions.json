@@ -1,0 +1,49 @@
+{
+  "phase": "FINALIZE",
+  "phase_name": "Project Finalization (DeployOrchestrator)",
+  "description": "Wire outputs, update docs, generate CI/CD templates",
+  "questions": [
+    {
+      "question": "Are all cross-module outputs correctly wired in the root main.tf?",
+      "category": "Outputs",
+      "required": true,
+      "notes": "Service modules export outputs that the root module re-exports or uses"
+    },
+    {
+      "question": "Is the state backend configuration (terraform backend.tf) correct?",
+      "category": "State",
+      "required": true,
+      "notes": "Remote state must point to the right S3 bucket and DynamoDB lock table"
+    },
+    {
+      "question": "Are CI/CD pipeline templates generated (GitHub Actions / GitLab CI)?",
+      "category": "CICD",
+      "required": true,
+      "notes": "Templates for plan, apply, drift detection, and rollback"
+    },
+    {
+      "question": "Is the README updated with architecture overview and instructions?",
+      "category": "Documentation",
+      "required": true,
+      "notes": "How to init, plan, apply, and manage the infrastructure"
+    },
+    {
+      "question": "Are Makefile targets created for common operations?",
+      "category": "LocalDev",
+      "required": false,
+      "notes": "make plan, make apply, make validate, etc."
+    },
+    {
+      "question": "Are pre-commit hooks configured for Terraform?",
+      "category": "LocalDev",
+      "required": false,
+      "notes": "Automatic fmt, validate, and security checks before commits"
+    },
+    {
+      "question": "Is the terraform.tfvars example file filled with sensible defaults?",
+      "category": "Configuration",
+      "required": false,
+      "notes": "Dev environment should have minimal but functional defaults"
+    }
+  ]
+}

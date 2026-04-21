@@ -1,0 +1,43 @@
+{
+  "phase": "GATE3_INPUTS",
+  "phase_name": "Inputs Collection Gate (BuildPlan)",
+  "description": "Verify all required Terraform variables are filled",
+  "questions": [
+    {
+      "question": "Are all required environment variables (REQUIRED) filled?",
+      "category": "Validation",
+      "required": true,
+      "notes": "Check 03_inputs_collection.md for ⚠️ REQUIRED markers"
+    },
+    {
+      "question": "Are database credentials and secrets externalized?",
+      "category": "Security",
+      "required": true,
+      "notes": "Use var.* references, never hardcode in .tf files"
+    },
+    {
+      "question": "Are all variable descriptions clear?",
+      "category": "Documentation",
+      "required": false,
+      "notes": "Future users should understand each variable's purpose"
+    },
+    {
+      "question": "Are default values appropriate for dev environment?",
+      "category": "Defaults",
+      "required": false,
+      "notes": "Defaults should be dev-safe (small instances, no backup)"
+    },
+    {
+      "question": "Are environment-specific overrides documented?",
+      "category": "Environments",
+      "required": false,
+      "notes": "How to override for staging/prod (instance sizes, replica counts)"
+    },
+    {
+      "question": "Are sensitive variable types marked?",
+      "category": "Security",
+      "required": false,
+      "notes": "Passwords, tokens, keys should have sensitive = true"
+    }
+  ]
+}

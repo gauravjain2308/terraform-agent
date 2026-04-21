@@ -1,0 +1,49 @@
+{
+  "phase": "DIAGRAM_INGESTED",
+  "phase_name": "Diagram Ingestion & Service Extraction",
+  "description": "Parse and extract services from draw.io diagram",
+  "questions": [
+    {
+      "question": "What is the project name?",
+      "category": "Project",
+      "required": true,
+      "notes": "Used for naming resources and state backend"
+    },
+    {
+      "question": "What is the target AWS region?",
+      "category": "Project",
+      "required": true,
+      "notes": "e.g. us-east-1, eu-west-1"
+    },
+    {
+      "question": "What are the identified infrastructure services?",
+      "category": "Services",
+      "required": true,
+      "notes": "List each service identified in the diagram with type and connections"
+    },
+    {
+      "question": "What are the service dependencies?",
+      "category": "Dependencies",
+      "required": true,
+      "notes": "Which services depend on which others for deployment order"
+    },
+    {
+      "question": "Are there any data stores (RDS, DynamoDB, S3)?",
+      "category": "Storage",
+      "required": false,
+      "notes": "Document storage requirements and configurations"
+    },
+    {
+      "question": "Are there networking resources (VPC, subnets, security groups)?",
+      "category": "Networking",
+      "required": false,
+      "notes": "Network topology and isolation requirements"
+    },
+    {
+      "question": "Are there any IAM role or policy requirements?",
+      "category": "IAM",
+      "required": false,
+      "notes": "Permissions needed for each service"
+    }
+  ]
+}

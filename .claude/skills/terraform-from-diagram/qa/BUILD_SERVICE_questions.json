@@ -1,0 +1,49 @@
+{
+  "phase": "BUILD_SERVICE",
+  "phase_name": "Service Code Generation (ServiceCodeWriter + TerraformValidator)",
+  "description": "Build and validate Terraform modules for individual services",
+  "questions": [
+    {
+      "question": "Does the service module follow terraform-standards (pinned providers, no hardcoded secrets)?",
+      "category": "CodeQuality",
+      "required": true,
+      "notes": "Read references/terraform-standards.md before reviewing"
+    },
+    {
+      "question": "Are all provider versions pinned with ~> constraints?",
+      "category": "Providers",
+      "required": true,
+      "notes": "Prevents breaking changes from minor/patch updates"
+    },
+    {
+      "question": "Are all variables externalized (no hardcoded values in main.tf)?",
+      "category": "Variables",
+      "required": true,
+      "notes": "Region, instance types, counts, subnets — all in variables.tf"
+    },
+    {
+      "question": "Are outputs correctly exported for other modules?",
+      "category": "Outputs",
+      "required": true,
+      "notes": "Downstream services need IDs, ARNs, endpoints from this module"
+    },
+    {
+      "question": "Are all resources tagged with Name and Environment tags?",
+      "category": "Tags",
+      "required": true,
+      "notes": "Consistent tagging for billing and resource tracking"
+    },
+    {
+      "question": "Did terraform validate and fmt succeed without errors?",
+      "category": "Validation",
+      "required": true,
+      "notes": "No syntax errors, proper formatting"
+    },
+    {
+      "question": "Does terraform plan show expected resource count?",
+      "category": "PlanReview",
+      "required": false,
+      "notes": "Plan output should match architecture intent"
+    }
+  ]
+}
