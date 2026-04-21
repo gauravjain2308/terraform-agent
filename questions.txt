@@ -1,0 +1,10 @@
+What is infrastructure as code?
+How does Terraform work?
+What are the benefits of using Terraform?
+What is a Terraform module?
+How do you manage state in Terraform?
+What is a resource in Terraform?
+How do you handle sensitive data in Terraform?
+What is the difference between var and local values?
+How do you use data sources in Terraform?
+What is a provisioner and when should you use it?

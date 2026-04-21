@@ -1,0 +1,11 @@
+# ═══════════════════════════════════════════════════════════════════
+# .claude/.gitignore
+# The entire .claude/ folder is gitignored from the root .gitignore.
+# This file is a safety net.
+# ═══════════════════════════════════════════════════════════════════
+
+# Ignore everything
+*
+
+# Except this file
+!.gitignore
