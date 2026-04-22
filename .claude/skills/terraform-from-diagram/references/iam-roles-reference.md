@@ -215,27 +215,57 @@ Apply this to every inline policy generated:
 
 ## IAM Review File Format
 
-The generated `agent/review/iam-model-review.md` uses this table structure:
+The generated `agent/review/iam-model-review.md` covers **all waves in one file** and has five sections:
 
-```markdown
-## IAM Roles Summary — {project_name}
-
-| # | Module | Role Name | Trust Principal | Managed Policies | Key Inline Permissions | Exports | Status |
-|---|--------|-----------|----------------|-----------------|----------------------|---------|--------|
-| 1 | iam-base-roles | lambda_execution_role | lambda.amazonaws.com | AWSLambdaBasicExecutionRole | - | lambda_execution_role_arn | ⏳ pending |
-...
-
-## Per-Service Inline Policies
-
-| # | Service | Needs Access To | Actions | Resource Scope | Added To Role | Status |
-|---|---------|----------------|---------|---------------|--------------|--------|
-| 1 | lambda-auth | rds-users secret | secretsmanager:GetSecretValue | arn:aws:secretsmanager:{region}:{account}:secret:{project}/rds-users/* | lambda_execution_role | ⏳ pending |
-...
-
-## Checklist
-- [ ] All roles have descriptions
-- [ ] No wildcard resources on data services
-- [ ] Permission boundaries applied (if required)
-- [ ] Monitoring roles created for RDS
-- [ ] CloudWatch role set for API Gateway
+### Section A — Header
 ```
+# IAM Review — {project_name}
+STATUS: PENDING
+Waves: {n} | Services: {n} | Roles: {n} | Inline policies: {n}
+```
+
+### Section B — Roles Summary (all waves)
+```markdown
+## Roles Summary — All Waves
+
+| Wave | Module | Role Resource Name | AWS Role Name (Naming Convention) | Trust Principal | Managed Policies | Outputs Exported | Build Status |
+|------|--------|--------------------|----------------------------------|-----------------|-----------------|-----------------|--------------|
+| 1 | iam-base-roles | `lambda_execution_role` | `{project}-lambda-execution` | lambda.amazonaws.com | AWSLambdaBasicExecutionRole | lambda_execution_role_arn | ⏳ pending |
+```
+
+### Section C — Inline Policies (all services)
+```markdown
+## Inline Policies — All Services
+
+| Wave | Consumer Service | Needs Access To | IAM Actions | Resource Scope | Attached To Role | Notes |
+|------|-----------------|----------------|-------------|---------------|-----------------|-------|
+| 2 | lambda-auth | rds-users secret | secretsmanager:GetSecretValue | arn:aws:secretsmanager:{region}:{account}:secret:{project}/rds-users/* | lambda_execution_role | ← fill account ID |
+```
+
+### Section D — Resource Policies (queues / buckets / topics)
+```markdown
+## Resource Policies — Queues / Buckets / Topics
+
+| Service | Resource Type | Policy Statement | Principal | Actions | Condition |
+|---------|--------------|-----------------|-----------|---------|-----------|
+| sqs-orders | SQS Queue | Allow producer | {lambda-arn} | sqs:SendMessage | — |
+```
+Omit this section if no SQS/SNS/S3 resource policies are needed.
+
+### Section E — Configuration & Checklist
+```markdown
+## IAM Configuration
+
+| Setting | Value |
+|---------|-------|
+| IAM path | `/app/` |
+| Permission boundary ARN | `none` |
+
+## Pre-lock Checklist
+- [ ] No bare * resource scopes on data services
+- [ ] No AdministratorAccess / PowerUserAccess
+- [ ] Every Secrets Manager / SSM consumer has kms:Decrypt scoped with kms:ViaService
+- [ ] All ← placeholders replaced
+```
+
+This file is used by `/ServiceCodeWriter` to determine which roles to reference, which inline policies to attach, and which resource policies to create per service module.

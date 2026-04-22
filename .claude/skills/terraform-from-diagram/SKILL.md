@@ -133,6 +133,7 @@ Re-run the Plan command as many times as needed while editing the review file. T
 ```
 
 Accept: `.drawio`/`.xml`, `.md`/`.txt`/`.pdf`, or both (preferred).
+**Diagram lookup order:** attached file first; if none attached, look **only in `docs/`** — do not search anywhere else in the workspace. If no file is found in `docs/`, stop and ask the user to place the file there.
 Parse draw.io XML → read `references/drawio-parsing.md` for full instructions.
 If no diagram: proceed with requirements only, note assumptions clearly.
 

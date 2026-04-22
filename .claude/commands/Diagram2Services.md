@@ -47,7 +47,10 @@ Wait for response before continuing.
 
 **Step 3 — Parse the diagram**
 
-Look for the attached `.drawio` or `.xml` file. If no file is attached, look in the workspace for any `.drawio` file and use that.
+Look for the attached `.drawio` or `.xml` file. If no file is attached, look **only in the `docs/` folder** for any `.drawio` or `.xml` file and use that. Do NOT search anywhere else in the workspace. If no file is found in `docs/`, stop and show:
+```
+❌ No diagram found. Place your .drawio or .xml file in the docs/ folder, then re-run /Diagram2Services.
+```
 
 Parse the XML:
 - mxCell with vertex="1" and a non-empty value → service/component
