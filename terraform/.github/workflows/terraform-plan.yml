@@ -1,0 +1,11 @@
+# GitHub Actions — Terraform Plan
+# Auto-runs on every PR and push to main that touches terraform/
+# Full workflow populated by /DeployOrchestrator ci
+name: Terraform Plan
+on:
+  pull_request:
+    paths: ['terraform/**']
+  push:
+    branches: [main]
+    paths: ['terraform/**']
+# TODO: populated by /DeployOrchestrator ci

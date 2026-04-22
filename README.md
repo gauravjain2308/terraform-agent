@@ -69,6 +69,43 @@ These files are written **progressively** — each answer is appended immediatel
 
 ---
 
+## Command Reference
+
+### Main Workflow — run in this order
+
+| # | Command | Phase | Type | Summary |
+|---|---------|-------|------|---------|
+| 1 | `/Diagram2Services` | 1–2 | Run | Parse diagram/requirements and extract the full service inventory |
+| 2 | `/ServicesRefiner` | 3 | Gate PLAN | Generate `services-review.md` pre-filled from the diagram; shows service list for editing |
+| 3 | `/ServicesRefinerConfirm` | 3 | Gate COMMIT | Validate and lock the service list; write `01-services.json` |
+| 4 | `/ServiceModeler` | 5 | Gate PLAN | Build dependency graph; generate `build-plan-review.md` with wave order and state backend suggestions |
+| 5 | `/ServiceModelerConfirm` | 5 | Gate COMMIT | Lock the build plan; scaffold `terraform/` directories; generate IAM files |
+| 6 | `/IAMModeler` | 5 | Gate PLAN | Generate IAM model review file with least-privilege policies per service |
+| 7 | `/IAMModelerConfirm` | 5 | Gate COMMIT | Validate and lock IAM model; required before the inputs gate |
+| 8 | `/BuildPlan` | 5b | Gate PLAN | Generate inputs collection per wave; marks `⚠️ REQUIRED` fields |
+| 9 | `/BuildPlanConfirm` | 5b | Gate COMMIT | Validate all inputs filled; write `tfvars.example` for dev + prod |
+| 10 | `/ServiceCodeWriter` | 7a | Build | Write Terraform `.tf` files for the next (or named) service — no CLI calls |
+| 11 | `/TerraformValidator` | 7b | Build | Run `terraform init / validate / fmt / plan / test` for the next (or named) service |
+| 12 | `/ServiceBuilder` | 7 | Build (legacy) | Combined writer + validator in one run |
+| 13 | `/DeployOrchestrator` | 8 | Finalize | Wire cross-module outputs, root `main.tf`, CI/CD workflows, and final README |
+
+### Utility & Diagnostic Commands
+
+| Command | Summary |
+|---------|---------|
+| `/tf-status` | Show current project phase, gate states, and build progress |
+| `/tf-resume` | Read memory and continue from the current phase without re-running earlier steps |
+| `/tf-reset` | Wipe `.claude/memory/` and start fresh (Terraform files are preserved) |
+| `/tf-scaffold` | Manually trigger directory scaffolding (Phase 6) |
+| `/tf-diagram-diff` | Detect drift between the source diagram and generated Terraform code |
+| `/tf-review` | Review existing Terraform files for standards compliance |
+| `/tf-cost` | Estimate monthly infrastructure cost using infracost |
+| `/tf-diagram-suggest` | Suggest improvements to the architecture diagram |
+| `/tf-diagram-sync` | Sync diagram changes into the generated Terraform code |
+| `/help` | List all available commands with one-line descriptions |
+
+---
+
 ## Installation
 
 ### Prerequisites

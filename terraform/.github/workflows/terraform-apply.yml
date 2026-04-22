@@ -1,0 +1,17 @@
+# GitHub Actions — Terraform Apply
+# MANUALLY TRIGGERED ONLY — never auto-applies
+# Full workflow populated by /DeployOrchestrator ci
+name: Terraform Apply
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to apply to'
+        type: choice
+        options: [dev, prod]
+        required: true
+      confirm:
+        description: 'Type "apply" to confirm you have reviewed the plan'
+        type: string
+        required: true
+# TODO: populated by /DeployOrchestrator ci
