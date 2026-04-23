@@ -1,0 +1,38 @@
+{
+  "project_name": "my-project",
+  "region": "us-east-1",
+  "environments": ["dev", "prod"],
+  "state_s3_bucket": "my-project-terraform-state",
+  "state_dynamodb_table": "my-project-terraform-lock",
+  "state_region": "us-east-1",
+  "waves": {
+    "1": ["networking-vpc", "iam-base-roles"],
+    "2": ["rds-users", "elasticache-redis"],
+    "3": ["lambda-auth"],
+    "4": ["api-gateway"]
+  },
+  "services": {
+    "networking-vpc":    { "type": "VPC",              "wave": 1 },
+    "iam-base-roles":    { "type": "IAM Role",         "wave": 1 },
+    "rds-users":         { "type": "RDS PostgreSQL",   "wave": 2 },
+    "elasticache-redis": { "type": "ElastiCache Redis","wave": 2 },
+    "lambda-auth":       { "type": "Lambda Function",  "wave": 3 },
+    "api-gateway":       { "type": "API Gateway HTTP", "wave": 4 }
+  },
+  "dependency_map": {
+    "rds-users": {
+      "networking-vpc": ["vpc_id", "private_subnet_ids"]
+    },
+    "elasticache-redis": {
+      "networking-vpc": ["vpc_id", "private_subnet_ids"]
+    },
+    "lambda-auth": {
+      "iam-base-roles":    ["lambda_execution_role_arn", "lambda_execution_role_name"],
+      "rds-users":         ["db_endpoint", "secret_arn"],
+      "elasticache-redis": ["redis_endpoint", "auth_token_secret_arn"]
+    },
+    "api-gateway": {
+      "lambda-auth": ["invoke_arn"]
+    }
+  }
+}

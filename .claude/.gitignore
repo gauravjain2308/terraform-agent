@@ -39,3 +39,10 @@ Thumbs.db
 
 # Lock file — ALWAYS commit (do NOT add here)
 # .terraform.lock.hcl
+
+# Memory state files — generated per-run, not committed
+memory/*.json
+memory/scaffold-manifest.json
+
+# Local settings overrides
+settings.local.json

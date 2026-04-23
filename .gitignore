@@ -1,3 +1,41 @@
-/*
-!/terraform/
-!.gitignore
+# Terraform provider cache — never commit
+**/.terraform/
+
+# State files — NEVER commit
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform.tfstate.lock.info
+
+# Variable files — NEVER commit real values
+*.tfvars
+!*.tfvars.example
+
+# Plan files
+tf.plan
+destroy.plan
+tf-cost.plan
+*.tfplan
+
+# Crash logs
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+
+# Generated deployment packages
+*.zip
+placeholder.zip
+
+# Per-run agent review outputs
+agent/review/
+
+# infracost / tflint cache
+.infracost/
+.tflint/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp

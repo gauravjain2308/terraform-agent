@@ -1,0 +1,688 @@
+#!/usr/bin/env python3
+"""
+scaffold.py
+Create the terraform/ project directory structure from a manifest file.
+
+Claude outputs a lightweight JSON manifest (~200 tokens).
+This script reads it and creates all directories and files from templates.
+No Claude tokens spent on file generation — all done locally.
+
+Usage:
+    python3 agent/scripts/scaffold/scaffold.py --manifest .claude/memory/scaffold-manifest.json
+    python3 agent/scripts/scaffold/scaffold.py --manifest .claude/memory/scaffold-manifest.json --dry-run
+    python3 agent/scripts/scaffold/scaffold.py --manifest .claude/memory/scaffold-manifest.json --wave 1
+
+Options:
+    --manifest PATH    Path to the scaffold manifest JSON file (required)
+    --dry-run          Show what would be created without writing files
+    --wave N           Only scaffold modules for wave N
+    --force            Overwrite existing files (default: skip existing)
+    --output DIR       Output directory (default: terraform/)
+"""
+
+import json
+import sys
+import os
+import shutil
+import subprocess
+import argparse
+from pathlib import Path
+from datetime import datetime
+
+# ─── Template library ─────────────────────────────────────────────────────────
+
+def tpl_terraform_version(ctx):
+    return "1.6.0\n"
+
+
+def tpl_tflint_hcl(ctx):
+    return '''plugin "aws" {
+  enabled = true
+  version = "0.32.0"
+  source  = "github.com/terraform-linters/tflint-ruleset-aws"
+}
+
+rule "terraform_naming_convention"    { enabled = true }
+rule "terraform_documented_variables" { enabled = true }
+rule "terraform_documented_outputs"   { enabled = true }
+rule "terraform_required_version"     { enabled = true }
+rule "terraform_required_providers"   { enabled = true }
+'''
+
+
+def tpl_gitignore(ctx):
+    return '''# Terraform working directories
+**/.terraform/
+
+# State files — NEVER commit
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform.tfstate.lock.info
+
+# Variable files — NEVER commit real values
+*.tfvars
+!*.tfvars.example
+
+# Plan files
+tf.plan
+destroy.plan
+tf-cost.plan
+*.tfplan
+
+# Crash logs
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+
+# Generated deployment packages
+*.zip
+placeholder.zip
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# infracost / tflint cache
+.infracost/
+.tflint/
+
+# Lock file — ALWAYS commit (do NOT add here)
+# .terraform.lock.hcl
+'''
+
+
+def tpl_env_versions(ctx):
+    return f'''terraform {{
+  required_version = ">= 1.6.0"
+
+  required_providers {{
+    aws = {{
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }}
+    random = {{
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }}
+  }}
+}}
+'''
+
+
+def tpl_env_provider(ctx):
+    return f'''provider "aws" {{
+  region  = var.region
+  profile = var.aws_profile
+
+  default_tags {{
+    tags = {{
+      Project     = var.project_name
+      Environment = var.environment
+      ManagedBy   = "terraform"
+    }}
+  }}
+}}
+
+# Uncomment for multi-region resources (ACM for CloudFront, WAF global):
+# provider "aws" {{
+#   alias   = "us_east_1"
+#   region  = "us-east-1"
+#   profile = var.aws_profile
+#   default_tags {{
+#     tags = {{
+#       Project     = var.project_name
+#       Environment = var.environment
+#       ManagedBy   = "terraform"
+#     }}
+#   }}
+# }}
+'''
+
+
+def tpl_env_backend(ctx, env):
+    project   = ctx["project_name"]
+    bucket    = ctx["state_s3_bucket"]
+    table     = ctx["state_dynamodb_table"]
+    region    = ctx["state_region"]
+    return f'''terraform {{
+  backend "s3" {{
+    bucket         = "{bucket}"
+    key            = "{project}/{env}/terraform.tfstate"
+    region         = "{region}"
+    dynamodb_table = "{table}"
+    encrypt        = true
+  }}
+}}
+'''
+
+
+def tpl_env_variables(ctx):
+    return f'''variable "project_name" {{
+  description = "Project name used in all resource names and tags."
+  type        = string
+
+  validation {{
+    condition     = can(regex("^[a-z][a-z0-9-]{{2,28}}[a-z0-9]$", var.project_name))
+    error_message = "project_name must be 4-30 chars, lowercase alphanumeric and hyphens."
+  }}
+}}
+
+variable "environment" {{
+  description = "Deployment environment."
+  type        = string
+
+  validation {{
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "environment must be one of: dev, staging, prod."
+  }}
+}}
+
+variable "region" {{
+  description = "AWS region for all resources."
+  type        = string
+}}
+
+variable "aws_profile" {{
+  description = "AWS CLI profile for local development. Leave empty in CI (uses OIDC role)."
+  type        = string
+  default     = ""
+}}
+
+variable "tags" {{
+  description = "Additional tags applied to all resources."
+  type        = map(string)
+  default     = {{}}
+}}
+'''
+
+
+def tpl_env_main(ctx, env):
+    project = ctx["project_name"]
+    lines   = [
+        f"# Root Module — {project} ({env})",
+        f"# Generated by scaffold.py — {datetime.now().strftime('%Y-%m-%d')}",
+        "#",
+        "# Module calls live in ./modules/{service}.tf (one file per service,",
+        "# written by /ServiceCodeWriter). Terraform auto-loads every *.tf in",
+        "# this directory — this file only holds root-level locals.",
+        "",
+        "locals {",
+        "  common_tags = merge(var.tags, {",
+        "    Project     = var.project_name",
+        "    Environment = var.environment",
+        "    ManagedBy   = \"terraform\"",
+        "  })",
+        "}",
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def tpl_env_modules_readme(env):
+    return (
+        "# Per-service module wiring\n"
+        "#\n"
+        "# Each service's `module \"...\"` block is written to its own file here\n"
+        f"# (e.g. `rds-users.tf`) by /ServiceCodeWriter. Terraform auto-loads every\n"
+        f"# *.tf file in this directory, so no root-level edits are needed.\n"
+        f"#\n"
+        f"# Environment: {env}\n"
+    )
+
+
+def tpl_env_tfvars_example(ctx, env):
+    project = ctx["project_name"]
+    region  = ctx["region"]
+    return f'''# Copy to terraform.tfvars and fill in your values.
+# terraform.tfvars is gitignored — never commit it.
+
+project_name = "{project}"
+environment  = "{env}"
+region       = "{region}"
+aws_profile  = "{project}-{env}"   # your AWS CLI profile name
+
+# Service-specific variables are added after /BuildPlan
+'''
+
+
+def tpl_module_versions(ctx, service):
+    return f'''# Module: {service}
+# Generated by scaffold.py — stub only, populated by /ServiceBuilder {service}
+terraform {{
+  required_providers {{
+    aws = {{
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }}
+  }}
+}}
+'''
+
+
+def tpl_module_variables(ctx, service):
+    deps = ctx.get("dependency_map", {}).get(service, {})
+    dep_lines = []
+    for provider, outputs in deps.items():
+        for out in outputs:
+            dep_lines.append(f"""
+variable "{out}" {{
+  description = "{out} from module {provider}."
+  type        = string
+}}""")
+
+    dep_block = "".join(dep_lines) if dep_lines else "\n# TODO: inputs from dependency map will be added by /ServiceBuilder"
+
+    return f'''# Module: {service}
+# Common variables — service-specific variables added by /ServiceBuilder {service}
+
+variable "project_name" {{
+  description = "Project name for resource naming and tagging."
+  type        = string
+}}
+
+variable "environment" {{
+  description = "Deployment environment (dev, staging, prod)."
+  type        = string
+
+  validation {{
+    condition     = contains(["dev", "staging", "prod"], var.environment)
+    error_message = "environment must be one of: dev, staging, prod."
+  }}
+}}
+
+variable "region" {{
+  description = "AWS region."
+  type        = string
+}}
+
+variable "tags" {{
+  description = "Tags to apply to all resources."
+  type        = map(string)
+  default     = {{}}
+}}
+{dep_block}
+'''
+
+
+def tpl_module_main(ctx, service, svc_info):
+    svc_type = svc_info.get("type", "unknown")
+    wave     = svc_info.get("wave", "?")
+    deps     = ctx.get("dependency_map", {}).get(service, {})
+    exports  = _find_consumers(ctx, service)
+
+    dep_str    = ", ".join(deps.keys()) if deps else "none"
+    export_str = ", ".join(exports)     if exports else "none"
+
+    return f'''# Module: {service}
+# Type:       {svc_type}
+# Wave:       {wave}
+# Depends on: {dep_str}
+# Consumed by:{export_str}
+#
+# Generated stub — full implementation added by /ServiceBuilder {service}
+
+locals {{
+  resource_prefix = "${{var.project_name}}-${{var.environment}}"
+
+  common_tags = merge(var.tags, {{
+    Project     = var.project_name
+    Environment = var.environment
+    ManagedBy   = "terraform"
+    Module      = "{service}"
+  }})
+}}
+
+# TODO: Resources generated by /ServiceBuilder {service}
+'''
+
+
+def tpl_module_outputs(ctx, service):
+    consumers = _find_consumers(ctx, service)
+    consumer_str = ", ".join(consumers) if consumers else "none"
+
+    return f'''# Module: {service}
+# Outputs consumed by: {consumer_str}
+# TODO: Outputs generated by /ServiceBuilder {service}
+'''
+
+
+def tpl_module_test(ctx, service):
+    project = ctx["project_name"]
+    region  = ctx["region"]
+    return f'''# Module: {service}
+# Tests generated by /ServiceBuilder {service}
+# Uses mock_provider — no AWS credentials needed
+
+# TODO: populated by /ServiceBuilder {service}
+# Will look like:
+#
+# mock_provider "aws" {{
+#   mock_resource "aws_example" {{
+#     defaults = {{ id = "mock-id", arn = "arn:aws:..." }}
+#   }}
+# }}
+#
+# run "plan_succeeds" {{
+#   command = plan
+#   variables {{
+#     project_name = "{project}"
+#     environment  = "dev"
+#   }}
+#   assert {{
+#     condition     = true
+#     error_message = "stub"
+#   }}
+# }}
+'''
+
+
+def tpl_module_test_fixtures(ctx, service):
+    project = ctx["project_name"]
+    region  = ctx["region"]
+    return f'''project_name = "test-{project}"
+environment  = "dev"
+region       = "{region}"
+'''
+
+
+def tpl_oidc_main(ctx):
+    project = ctx["project_name"]
+    return f'''# GitHub Actions OIDC Roles
+# Run once: cd iam-github-oidc && terraform init && terraform apply
+# Then add the 3 role ARN outputs to GitHub repo secrets.
+
+terraform {{
+  required_providers {{
+    aws = {{
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }}
+  }}
+}}
+
+data "aws_caller_identity" "current" {{}}
+
+resource "aws_iam_openid_connect_provider" "github" {{
+  url             = "https://token.actions.githubusercontent.com"
+  client_id_list  = ["sts.amazonaws.com"]
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+}}
+
+data "aws_iam_policy_document" "github_assume" {{
+  statement {{
+    effect  = "Allow"
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {{
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
+    }}
+
+    condition {{
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }}
+
+    condition {{
+      test     = "StringLike"
+      variable = "token.actions.githubusercontent.com:sub"
+      # TODO: replace YOUR_ORG/YOUR_REPO with your GitHub org and repo name
+      values   = ["repo:YOUR_ORG/YOUR_REPO:*"]
+    }}
+  }}
+}}
+
+resource "aws_iam_role" "github_plan" {{
+  name               = "{project}-github-plan"
+  assume_role_policy = data.aws_iam_policy_document.github_assume.json
+  description        = "GitHub Actions: terraform plan (read-only)"
+  tags               = {{ Project = "{project}", ManagedBy = "terraform" }}
+}}
+
+resource "aws_iam_role" "github_apply_dev" {{
+  name               = "{project}-github-apply-dev"
+  assume_role_policy = data.aws_iam_policy_document.github_assume.json
+  description        = "GitHub Actions: terraform apply to dev"
+  tags               = {{ Project = "{project}", ManagedBy = "terraform" }}
+}}
+
+resource "aws_iam_role" "github_apply_prod" {{
+  name               = "{project}-github-apply-prod"
+  assume_role_policy = data.aws_iam_policy_document.github_assume.json
+  description        = "GitHub Actions: terraform apply to prod (manual approval required)"
+  tags               = {{ Project = "{project}", ManagedBy = "terraform" }}
+}}
+'''
+
+
+def tpl_oidc_outputs(ctx):
+    return '''output "plan_role_arn" {
+  description = "Add to GitHub secret: AWS_PLAN_ROLE_ARN"
+  value       = aws_iam_role.github_plan.arn
+}
+
+output "apply_dev_role_arn" {
+  description = "Add to GitHub secret: AWS_APPLY_ROLE_ARN_DEV"
+  value       = aws_iam_role.github_apply_dev.arn
+}
+
+output "apply_prod_role_arn" {
+  description = "Add to GitHub secret: AWS_APPLY_ROLE_ARN_PROD"
+  value       = aws_iam_role.github_apply_prod.arn
+}
+'''
+
+
+def tpl_workflow_plan(ctx):
+    return '''# GitHub Actions — Terraform Plan
+# Auto-runs on every PR and push to main that touches terraform/
+# Full workflow populated by /DeployOrchestrator ci
+name: Terraform Plan
+on:
+  pull_request:
+    paths: ['terraform/**']
+  push:
+    branches: [main]
+    paths: ['terraform/**']
+# TODO: populated by /DeployOrchestrator ci
+'''
+
+
+def tpl_workflow_apply(ctx):
+    return '''# GitHub Actions — Terraform Apply
+# MANUALLY TRIGGERED ONLY — never auto-applies
+# Full workflow populated by /DeployOrchestrator ci
+name: Terraform Apply
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to apply to'
+        type: choice
+        options: [dev, prod]
+        required: true
+      confirm:
+        description: 'Type "apply" to confirm you have reviewed the plan'
+        type: string
+        required: true
+# TODO: populated by /DeployOrchestrator ci
+'''
+
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _find_consumers(ctx, service):
+    """Find all services that consume outputs from this service."""
+    consumers = []
+    for consumer, deps in ctx.get("dependency_map", {}).items():
+        if service in deps:
+            consumers.append(consumer)
+    return consumers
+
+
+def _all_services_flat(ctx, wave_filter=None):
+    """Return flat list of (service_name, service_info) optionally filtered by wave."""
+    result = []
+    for svc_id, info in ctx.get("services", {}).items():
+        if wave_filter is None or str(info.get("wave")) == str(wave_filter):
+            result.append((svc_id, info))
+    return result
+
+
+# ─── Scaffold engine ──────────────────────────────────────────────────────────
+
+def scaffold(manifest_path, dry_run=False, wave_filter=None, force=False, output_dir="terraform", skip_fmt=False):
+    manifest_path = Path(manifest_path)
+    if not manifest_path.exists():
+        print(f"❌ Manifest not found: {manifest_path}")
+        print("   Run /tf-scaffold in Claude Code first to generate the manifest.")
+        sys.exit(1)
+
+    state_file = Path(".claude/memory/tf-state.json")
+    if not state_file.exists() and not dry_run:
+        print(f"❌ State file not found: {state_file}")
+        print("   Run /Diagram2Services first — scaffold must run after project bootstrap.")
+        sys.exit(1)
+
+    ctx = json.loads(manifest_path.read_text())
+    base = Path(output_dir)
+
+    print(f"\n{'DRY RUN — ' if dry_run else ''}Scaffolding {output_dir}/")
+    print(f"  Project:  {ctx['project_name']}")
+    print(f"  Services: {sum(len(v) for v in ctx['waves'].values())}")
+    print(f"  Waves:    {len(ctx['waves'])}")
+    if wave_filter:
+        print(f"  Filter:   wave:{wave_filter} only")
+    print()
+
+    created = []
+    skipped = []
+
+    def write(path, content):
+        full = base / path
+        if full.exists() and not force:
+            skipped.append(str(path))
+            return
+        if dry_run:
+            print(f"  [would create] {path}")
+            created.append(str(path))
+            return
+        full.parent.mkdir(parents=True, exist_ok=True)
+        full.write_text(content)
+        created.append(str(path))
+        print(f"  + {path}")
+
+    # ── Root files ─────────────────────────────────────────────────────────
+
+    if not wave_filter:
+        write(".terraform-version",   tpl_terraform_version(ctx))
+        write(".tflint.hcl",          tpl_tflint_hcl(ctx))
+        write(".gitignore",            tpl_gitignore(ctx))
+
+        # Environments
+        for env in ctx.get("environments", ["dev", "prod"]):
+            write(f"environments/{env}/versions.tf",           tpl_env_versions(ctx))
+            write(f"environments/{env}/provider.tf",           tpl_env_provider(ctx))
+            write(f"environments/{env}/backend.tf",            tpl_env_backend(ctx, env))
+            write(f"environments/{env}/variables.tf",          tpl_env_variables(ctx))
+            write(f"environments/{env}/main.tf",               tpl_env_main(ctx, env))
+            write(f"environments/{env}/modules/README.md",     tpl_env_modules_readme(env))
+            write(f"environments/{env}/terraform.tfvars.example", tpl_env_tfvars_example(ctx, env))
+
+        # iam-github-oidc
+        write("iam-github-oidc/main.tf",    tpl_oidc_main(ctx))
+        write("iam-github-oidc/outputs.tf", tpl_oidc_outputs(ctx))
+
+        # CI/CD stubs
+        write(".github/workflows/terraform-plan.yml",  tpl_workflow_plan(ctx))
+        write(".github/workflows/terraform-apply.yml", tpl_workflow_apply(ctx))
+
+    # ── Module stubs ───────────────────────────────────────────────────────
+
+    for svc_id, svc_info in _all_services_flat(ctx, wave_filter):
+        write(f"modules/{svc_id}/versions.tf",                   tpl_module_versions(ctx, svc_id))
+        write(f"modules/{svc_id}/variables.tf",                  tpl_module_variables(ctx, svc_id))
+        write(f"modules/{svc_id}/main.tf",                       tpl_module_main(ctx, svc_id, svc_info))
+        write(f"modules/{svc_id}/outputs.tf",                    tpl_module_outputs(ctx, svc_id))
+        write(f"modules/{svc_id}/tests/main.tftest.hcl",         tpl_module_test(ctx, svc_id))
+        write(f"modules/{svc_id}/tests/fixtures/test.tfvars",    tpl_module_test_fixtures(ctx, svc_id))
+
+    # ── Summary ────────────────────────────────────────────────────────────
+
+    print()
+    print(f"{'─' * 50}")
+    print(f"  Created: {len(created)} files")
+    if skipped:
+        print(f"  Skipped: {len(skipped)} files (already exist — use --force to overwrite)")
+    print(f"{'─' * 50}")
+
+    if not dry_run and created:
+        # Run terraform fmt (only if terraform is on PATH and not skipped)
+        if skip_fmt:
+            print("  terraform fmt:  ⏭️  skipped (--skip-fmt)")
+        elif shutil.which("terraform") is None:
+            print("  terraform fmt:  ⏭️  skipped (terraform not on PATH)")
+            print("                   install terraform and re-run, or pass --skip-fmt to silence this")
+        else:
+            result = subprocess.run(
+                ["terraform", "fmt", "-recursive", output_dir],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                print("  terraform fmt:  ✅ passed")
+            else:
+                print(f"  terraform fmt:  ⚠️  exit={result.returncode}")
+                if result.stderr:
+                    print(f"                   stderr: {result.stderr.strip()}")
+
+        # Update memory — state file existence was validated at scaffold() entry
+        state = json.loads(state_file.read_text())
+        state["scaffold_complete"] = True
+        state["scaffold_completed_at"] = datetime.now().isoformat()
+        state_file.write_text(json.dumps(state, indent=2))
+        print("  memory updated: ✅ scaffold_complete = true")
+
+    print()
+    if dry_run:
+        print("Dry run complete — no files written. Remove --dry-run to create.")
+    else:
+        print(f"✅ {output_dir}/ scaffolded successfully.")
+        print()
+        print("Next steps:")
+        print("  1. Open terraform/ in VS Code — review the structure")
+        print("  2. Run: /IAMModeler  (generate IAM roles review)")
+        print("  3. Run: /BuildPlan  (collect config values per wave)")
+
+
+# ─── CLI ──────────────────────────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Scaffold terraform/ directory from Claude manifest",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__
+    )
+    parser.add_argument("--manifest",  required=True, help="Path to scaffold-manifest.json")
+    parser.add_argument("--dry-run",   action="store_true", help="Show what would be created")
+    parser.add_argument("--wave",      type=int, help="Only scaffold modules for wave N")
+    parser.add_argument("--force",     action="store_true", help="Overwrite existing files")
+    parser.add_argument("--output",    default="terraform", help="Output directory (default: terraform/)")
+    parser.add_argument("--skip-fmt",  action="store_true", help="Skip terraform fmt post-scaffold (useful on machines without terraform CLI)")
+    args = parser.parse_args()
+
+    scaffold(
+        manifest_path=args.manifest,
+        dry_run=args.dry_run,
+        wave_filter=args.wave,
+        force=args.force,
+        output_dir=args.output,
+        skip_fmt=args.skip_fmt,
+    )
+
+
+if __name__ == "__main__":
+    main()
