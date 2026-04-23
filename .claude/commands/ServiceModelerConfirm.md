@@ -17,7 +17,7 @@ Validate:
 - No circular dependencies (service in Wave N cannot depend on Wave N or later)
 - All services in Dependency Map exist in Services Review service list
 - state_s3_bucket is filled in and not a placeholder
-- state_dynamodb_table is filled in
+- state_use_lockfile is set to true
 - state_region is filled in
 - secrets_strategy is set to a valid value
 - STATUS is PENDING
@@ -36,7 +36,7 @@ Ready to lock Service Model:
       Roles: {comma-separated role names required — or "none required"}
     ...
   Dependencies: {n} connections
-  State:        s3://{bucket}  |  DynamoDB: {table}
+  State:        s3://{bucket}  |  Lock: S3 native (use_lockfile = true)
   Secrets:      {strategy}
 
   IAM roles are wave-scoped: each role is applied during /ServiceCodeWriter for its wave.
@@ -65,7 +65,7 @@ Write `.claude/memory/02-build-plan.json`:
   "dependency_map": { "{consumer}": { "{provider}": ["{outputs}"] } },
   "state_backend": {
     "s3_bucket": "{value}",
-    "dynamodb_table": "{value}",
+    "use_lockfile": true,
     "region": "{value}"
   },
   "secrets_strategy": "{value}"
@@ -89,7 +89,7 @@ Show: `✅ Step 1/4 — Build plan locked`
   "region": "{value}",
   "environments": ["{env1}", "{env2}"],
   "state_s3_bucket": "{value}",
-  "state_dynamodb_table": "{value}",
+  "state_use_lockfile": true,
   "state_region": "{value}",
   "waves": { "1": ["{service-ids}"], "2": [...] },
   "services": {

@@ -39,12 +39,14 @@ Follow all standards in `references/terraform-standards.md`.
 
 ### Step 7c — Write per-service wiring file
 
-Write exactly one file per environment: `environments/{dev,prod}/modules/{service-name}.tf`
+Write exactly one file per environment: `environments/{dev,prod}/{service-name}.tf`
 containing only this service's `module { ... }` block. Never edit the shared
-`environments/{dev,prod}/main.tf`. If previously-built services depend on this
-service's new outputs, update only their `modules/{dep}/variables.tf`.
+`environments/{dev,prod}/main.tf`. **Do NOT create a `modules/` subdirectory inside
+the environment folder — Terraform only auto-loads `.tf` files from the root of the
+working directory, not from subdirectories.** If previously-built services depend on
+this service's new outputs, update only their `modules/{dep}/variables.tf`.
 ```
-   ↺ Wired: environments/{dev,prod}/modules/rds-users.tf
+   ↺ Wired: environments/{dev,prod}/rds-users.tf
       Dependent vars updated: lambda-auth/variables.tf
 ```
 

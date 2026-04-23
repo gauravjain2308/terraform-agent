@@ -16,11 +16,24 @@ locals {
 data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
+data "archive_file" "placeholder" {
+  type        = "zip"
+  output_path = "${path.module}/placeholder_generated.zip"
+  source {
+    content  = "def handler(event, context): return {'statusCode': 200}"
+    filename = "index.py"
+  }
+}
+
 resource "aws_cloudwatch_log_group" "lambda" {
   name              = "/aws/lambda/${local.function_name}"
   retention_in_days = var.log_retention_days
 
   tags = local.common_tags
+}
+
+locals {
+  effective_package_path = var.lambda_package_path != "" ? var.lambda_package_path : data.archive_file.placeholder.output_path
 }
 
 resource "aws_lambda_function" "main" {
@@ -33,7 +46,8 @@ resource "aws_lambda_function" "main" {
   timeout       = var.timeout
   package_type  = "Zip"
 
-  filename = var.lambda_package_path
+  filename         = local.effective_package_path
+  source_code_hash = var.lambda_package_path != "" ? null : data.archive_file.placeholder.output_base64sha256
 
   reserved_concurrent_executions = var.reserved_concurrency
 

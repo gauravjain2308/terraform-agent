@@ -113,6 +113,30 @@ Read `agent/review/iam-model-review.json` — find all IAM entries for this serv
    `iam-generator.py`. Do NOT regenerate it. It is ready to apply.
    Verify it exists. If missing: run `python3 agent/scripts/scaffold/iam-generator.py`.
 
+   **Also create the environment wiring files if they don't exist yet** — iam-base-roles
+   is a foundation module that must be wired before any Lambda/ECS service can reference
+   its outputs. Check for and create if missing:
+
+   `terraform/environments/dev/iam-base-roles.tf`:
+   ```hcl
+   module "iam_base_roles" {
+     source = "../../modules/iam-base-roles"
+
+     project_name             = var.project_name
+     environment              = var.environment
+     region                   = var.region
+     tags                     = local.common_tags
+     iam_path                 = "/"
+     permission_boundary_arn  = ""
+     lambda_vpc_enabled       = false
+   }
+   ```
+
+   `terraform/environments/prod/iam-base-roles.tf` — same block, same values
+   (prod uses same relative source path `../../modules/iam-base-roles`).
+
+   Show: `Wired: terraform/environments/{dev,prod}/iam-base-roles.tf`
+
 2. If this service has a `terraform/modules/{service}/iam.tf` (pre-generated):
    Read it. The inline policies and resource-based policies are already there.
    Add any `extra_permissions` from `03-inputs-wave-{n}.json` IAM section to `iam.tf`.
@@ -196,17 +220,21 @@ Repeat for every role+attachment pair in `iam.tf`. Capture full output to `agent
 Instead of editing shared `terraform/environments/{dev,prod}/main.tf`, write exactly
 **one file per environment per service** containing only that service's `module { ... }` block:
 
-- `terraform/environments/dev/modules/{service-name}.tf`
-- `terraform/environments/prod/modules/{service-name}.tf`
+- `terraform/environments/dev/{service-name}.tf`
+- `terraform/environments/prod/{service-name}.tf`
 
-Create the `modules/` subdirectory if it doesn't exist. Terraform natively loads
-every `*.tf` in a directory, so this is picked up automatically — no change
-needed to `environments/{dev,prod}/main.tf`.
+Terraform natively loads every `*.tf` in a directory, so this is picked up automatically —
+no change needed to `environments/{dev,prod}/main.tf`.
 
 The block must include:
-- `source = "../../../modules/{service-name}"`
+- `source = "../../modules/{service-name}"`  ← two levels up (environments/dev → terraform → modules)
 - All required input variables, wired from root variables or other modules' outputs
 - Dev file uses dev values; prod file uses prod values (from `03-inputs-wave-{n}.json`)
+
+**iam-base-roles wiring guard:** Before writing a service that consumes `module.iam_base_roles`
+outputs, verify that `terraform/environments/dev/iam-base-roles.tf` exists. If it doesn't,
+create it now (per Step 4 item 1 template) before writing the consumer service's wiring file.
+This prevents the "Reference to undeclared module" error at plan time.
 
 **Dependent-variable wiring (allowed exception):**
 If any previously-built service depends on this service's new outputs, add those
@@ -216,8 +244,8 @@ only. Do NOT touch any other file.
 Show only:
 ```
 Wired:
-  terraform/environments/dev/modules/{service-name}.tf
-  terraform/environments/prod/modules/{service-name}.tf
+  terraform/environments/dev/{service-name}.tf
+  terraform/environments/prod/{service-name}.tf
 Dependent vars updated: {list or "none"}
 ```
 
@@ -275,7 +303,7 @@ Write `.claude/memory/handoff.json`:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ Code written: {service-name}  [Wave {n} — {x}/{total_in_wave}]
    Module:    terraform/modules/{service-name}/
-   Wired:     terraform/environments/{dev,prod}/modules/{service-name}.tf
+   Wired:     terraform/environments/{dev,prod}/{service-name}.tf
    Status:    CODE_WRITTEN   (awaiting validation)
    Log:       → agent/execution.md
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

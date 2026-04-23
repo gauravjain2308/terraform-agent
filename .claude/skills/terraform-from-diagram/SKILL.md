@@ -186,6 +186,7 @@ Read `references/build-plan-guide.md` for ordering rules and output format.
 
 Create project directory structure. Read `references/project-structure.md` for the full directory tree and `.gitignore` rules.
 Read `references/terraform-standards.md` before generating any `.tf` files.
+Read `references/bootstrap-guide.md` and generate the `state-bootstrap/` module (3 files: `main.tf`, `variables.tf`, `versions.tf`). This module must be created during scaffold — it is required before `terraform init` can succeed.
 
 ---
 
@@ -281,6 +282,7 @@ On confirmation: delete all files in `.claude/memory/`, confirm deletion.
 | `references/build-plan-guide.md` | `/ServiceModeler` only |
 | `references/inputs-template-guide.md` | `/BuildPlan` only |
 | `references/project-structure.md` | `/tf-scaffold` only |
+| `references/bootstrap-guide.md` | `/tf-scaffold` (Phase 6) and `/DeployOrchestrator` (Phase 8) |
 | `references/service-building-steps.md` | `/ServiceCodeWriter`, `/TerraformValidator`, `/ServiceBuilder` |
 | `references/execution-format.md` | Build commands (when appending to execution.md) |
 | `references/finalize-checklist.md` | `/DeployOrchestrator` only |

@@ -46,7 +46,7 @@ s3_bucket:      {project_name}-tf-state-{region_short}
                 e.g. my-project-tf-state-use1   (us-east-1 → use1)
                 e.g. my-project-tf-state-euw1   (eu-west-1 → euw1)
 
-dynamodb_table: {project_name}-tf-lock
+use_lockfile:   true  (S3 native locking — no DynamoDB table needed, requires Terraform ≥ 1.10)
 
 Region shorthand map:
   us-east-1      → use1     us-east-2    → use2
@@ -154,9 +154,9 @@ state_s3_bucket:      {project_name}-tf-state-{region_short}
 # Rules: globally unique, lowercase, hyphens only, 3-63 chars
 # Terraform will create this S3 bucket during bootstrap
 
-state_dynamodb_table: {project_name}-tf-lock
-# Suggested name — change if needed
-# Rules: 3-255 chars, alphanumeric + hyphens + dots + underscores
+state_use_lockfile: true
+# S3 native locking (Terraform ≥ 1.10) — no DynamoDB table needed
+# Stores a .tflock object in the same state S3 bucket
 
 state_region:         {region}
 # Region where state is stored — usually same as project region
@@ -216,7 +216,7 @@ Proposed build: {n} waves, {n} services  (1 service per wave — grouped only fo
 
 State backend (suggested — Terraform will create these):
   S3:       {suggested_bucket_name}
-  DynamoDB: {suggested_table_name}
+  Lock:     S3 native (use_lockfile = true, Terraform ≥ 1.10)
 
 Next:
   1. Open agent/review/build-plan-review.md in VS Code

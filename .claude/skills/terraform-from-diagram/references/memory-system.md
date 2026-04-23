@@ -156,7 +156,7 @@ If a prerequisite is missing, Claude must say:
   },
   "state_backend": {
     "s3_bucket": "myproject-tf-state",
-    "dynamodb_table": "myproject-tf-lock",
+    "use_lockfile": true,
     "region": "us-east-1"
   },
   "environments": ["dev", "prod"]

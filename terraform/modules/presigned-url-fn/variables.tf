@@ -112,9 +112,9 @@ variable "reserved_concurrency" {
 }
 
 variable "lambda_package_path" {
-  description = "Local path to the Lambda deployment ZIP. Managed externally by CI/CD."
+  description = "Local path to the Lambda deployment ZIP. Leave empty to use the auto-generated placeholder (first deploy only)."
   type        = string
-  default     = "placeholder.zip"
+  default     = ""
 }
 
 variable "log_retention_days" {

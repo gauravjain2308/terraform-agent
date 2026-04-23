@@ -39,7 +39,7 @@ These appear at the top of every generated template, regardless of services:
 | `terraform_version` | Minimum Terraform version | e.g. `>= 1.6.0` | __________ |
 | `aws_provider_version` | AWS provider pin | e.g. `~> 5.0` | __________ |
 | `state_s3_bucket` | S3 bucket for Terraform state | existing bucket name | __________ |
-| `state_dynamodb_table` | DynamoDB table for state locking | existing table name | __________ |
+| `state_use_lockfile` | S3 native state locking (Terraform ≥ 1.10, replaces DynamoDB) | `true` | `true` |
 | `default_tags` | Tags applied to every resource | key=value pairs | __________ |
 ```
 

@@ -3,7 +3,7 @@ terraform {
     bucket         = "s3-presigned-url-upload-tf-state-use1"
     key            = "s3-presigned-url-upload/prod/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "s3-presigned-url-upload-tf-lock"
+    use_lockfile   = true
     encrypt        = true
   }
 }

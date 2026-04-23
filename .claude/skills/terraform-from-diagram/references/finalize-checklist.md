@@ -34,9 +34,10 @@
    Validation: fmt ✅  validate ✅  tflint ✅  checkov ✅
 
    Next steps:
-     1. make setup                (first-time local init)
-     2. make plan                 (see what will change)
-     3. cd iam-github-oidc && terraform apply  (CI bootstrap, once)
+     1. cd state-bootstrap && terraform init && terraform apply  (create S3 state bucket — FIRST)
+     2. make setup                (first-time local init — requires state bucket to exist)
+     3. make plan                 (see what will change)
+     4. cd iam-github-oidc && terraform apply  (CI bootstrap, once)
 
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    ✅  Done. Files written. Context can be cleared.

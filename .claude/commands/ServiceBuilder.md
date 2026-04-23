@@ -25,7 +25,7 @@ Run the following sequence. Pass `$ARGUMENTS` through unchanged to each.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ {service-name}  [Wave {n} — {x}/{total_in_wave}]
    Code:       → terraform/modules/{service-name}/
-   Wired:      → terraform/environments/{dev,prod}/modules/{service-name}.tf
+   Wired:      → terraform/environments/{dev,prod}/{service-name}.tf
    Validate:   ✅ passed
    Plan:       {n} to add, {n} to change, {n} to destroy
    Tests:      {n}/{n} passed

@@ -1,9 +1,9 @@
 terraform {
   backend "s3" {
-    bucket         = "s3-presigned-url-upload-tf-state-use1"
-    key            = "s3-presigned-url-upload/dev/terraform.tfstate"
+    bucket         = "test-project-terraform-state-use1"
+    key            = "test-project-terraform-state-use1/dev/terraform.tfstate"
     region         = "us-east-1"
-    dynamodb_table = "s3-presigned-url-upload-tf-lock"
+    use_lockfile   = true
     encrypt        = true
   }
 }

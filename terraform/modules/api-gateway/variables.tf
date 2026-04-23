@@ -36,14 +36,6 @@ variable "function_arn" {
   type        = string
 }
 
-# ── IAM (from iam-base-roles, used by iam.tf) ─────────────────────────────────
-
-variable "api_gateway_name" {
-  description = "Name of the IAM role to attach the API Gateway inline policy to."
-  type        = string
-  default     = ""
-}
-
 # ── API Gateway configuration ─────────────────────────────────────────────────
 
 variable "api_name_suffix" {

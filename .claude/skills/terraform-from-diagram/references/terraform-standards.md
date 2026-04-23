@@ -205,6 +205,37 @@ resource "aws_s3_bucket" "main" {
 
 ---
 
+## State Backend (backend.tf — Root Module Only)
+
+Every root environment directory must have a `backend.tf`. Use `use_lockfile = true` for S3
+native state locking (Terraform ≥ 1.10). **Never use `dynamodb_table` — it is deprecated.**
+
+```hcl
+# environments/{env}/backend.tf
+# Replace {project_name}, {env}, and region with literal values.
+# Terraform backend blocks do NOT accept variable references — values must be hardcoded strings.
+# The S3 bucket must exist BEFORE running `terraform init`.
+# Run state-bootstrap/ once first to create it. See references/bootstrap-guide.md.
+terraform {
+  backend "s3" {
+    bucket       = "{project_name}-tf-state-use1"
+    key          = "{project_name}/{env}/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
+  }
+}
+```
+
+> `use_lockfile = true` stores a `.tflock` object in the same S3 bucket — no DynamoDB table
+> needed. Requires Terraform ≥ 1.10 and `s3:PutObject` / `s3:DeleteObject` on the state bucket path.
+
+> **Bootstrap required:** The S3 bucket must exist before `terraform init` succeeds. Generate
+> and apply the `state-bootstrap/` module (or run the AWS CLI fallback) exactly once before
+> your first `terraform init`. See `references/bootstrap-guide.md`.
+
+---
+
 ## Provider Configuration (Root Module Only)
 
 Every root environment module must have a provider block. Child modules never configure providers.
