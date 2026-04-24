@@ -4,6 +4,11 @@ Validate already-generated Terraform code. **This command does NOT rewrite code*
 — it only runs terminal commands and reports results. If validation fails, the
 user re-runs `/ServiceCodeWriter {service-name}` to regenerate.
 
+> **Optional step** — `/TerraformValidator` is NOT required to unblock the next wave.
+> Services at `CODE_WRITTEN` status are sufficient for `/ServiceCodeWriter` to proceed
+> to the next wave. Run this command when you want explicit validation confirmation
+> or before running `/DeployOrchestrator`.
+
 Modes:
   /TerraformValidator                        → validate next service at CODE_WRITTEN status (from handoff.json)
   /TerraformValidator service:{name}         → validate one specific service module

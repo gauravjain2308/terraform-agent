@@ -55,14 +55,15 @@ are skipped (use `/TerraformValidator` for the next step, or re-run this command
 with an explicit service name to overwrite).
 
 **Dependency check before writing any service:**
-All services from earlier waves must be `COMPLETE` in `04-build-progress.json`
-(i.e. they must have passed validation, not just code generation). If not:
+All services from earlier waves must be at least `CODE_WRITTEN` (or `COMPLETE`)
+in `04-build-progress.json`. `/TerraformValidator` is optional — code generation
+for the next wave does not require it. If earlier wave services haven't had code
+written yet:
 ```
-❌ Cannot write {service} (Wave {n}) — Wave {n-1} not complete:
+❌ Cannot write {service} (Wave {n}) — Wave {n-1} code not yet written:
    Missing: {service-name} (Wave {n-1})
-   Finish Wave {n-1} first:
+   Write Wave {n-1} code first:
      /ServiceCodeWriter wave:{n-1}
-     /TerraformValidator wave:{n-1}
 ```
 
 Also check that inputs are confirmed for the wave being written:
@@ -287,15 +288,17 @@ Update `.claude/memory/04-build-progress.json`:
   `"CREATED"` | `"SKIPPED"` | `"NOT_REQUIRED"` | `"ERROR"`
 - If `iam_status` is `"SKIPPED"`, also set `"iam_warning": true` so downstream
   commands (`/TerraformValidator`, `/DeployOrchestrator`) can surface the alert.
-- Do NOT mark the wave complete — that happens only after all services reach `COMPLETE` via `/TerraformValidator`.
+- Do NOT mark the wave complete — that happens only after all services reach `COMPLETE` via `/TerraformValidator`. Wave COMPLETE status is used by `/DeployOrchestrator` and for reporting only; it does NOT gate the next wave.
 
 Update `.claude/memory/tf-state.json`:
 - Set `last_command` → `"/ServiceCodeWriter"` and `last_updated` → current ISO timestamp.
 - Set `current_phase` → `"DEPLOYING"`.
 
 Write `.claude/memory/handoff.json`:
-- `"next_command": "/TerraformValidator service:{service-name}"`
-- `"phase": "DEPLOYING"`
+- If more services remain in this wave or the next wave has unwritten services:
+  `"next_command": "/ServiceCodeWriter"` and `"phase": "DEPLOYING"`
+- If all services across all waves are at least `CODE_WRITTEN`:
+  `"next_command": "/TerraformValidator"` and `"phase": "DEPLOYING"`
 
 ## Step 8 — Show result and next-steps block
 
@@ -304,16 +307,19 @@ Write `.claude/memory/handoff.json`:
 ✅ Code written: {service-name}  [Wave {n} — {x}/{total_in_wave}]
    Module:    terraform/modules/{service-name}/
    Wired:     terraform/environments/{dev,prod}/{service-name}.tf
-   Status:    CODE_WRITTEN   (awaiting validation)
+   Status:    CODE_WRITTEN   (validation optional)
    Log:       → agent/execution.md
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-▶  NEXT STEPS — validate the generated code
+▶  NEXT STEPS
 
-  Option A (recommended — skill runs it for you):
+  Option A — write the next service (no validation required):
+    /ServiceCodeWriter
+
+  Option B — validate this service first (optional, recommended):
     /TerraformValidator service:{service-name}
 
-  Option B (manual — run in VS Code terminal):
+  Option C — validate manually in VS Code terminal:
     cd terraform/modules/{service-name}
     terraform init -backend=false
     terraform validate
@@ -321,9 +327,6 @@ Write `.claude/memory/handoff.json`:
 
   If validation fails, re-run the writer to regenerate:
     /ServiceCodeWriter {service-name}
-
-  After validation passes, write the next service:
-    /ServiceCodeWriter
 ```
 
 End with:
@@ -331,6 +334,6 @@ End with:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅  Done. Code written. Clear context.
     Run:  /clear
-    Then: /TerraformValidator service:{service-name}
+    Then: /ServiceCodeWriter   ← or /TerraformValidator service:{service-name} (optional)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
